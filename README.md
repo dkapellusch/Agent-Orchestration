@@ -11,12 +11,29 @@ Robust AI agent orchestration with iterative refinement, automatic rate limiting
 ### Install
 
 ```bash
-git clone https://github.com/dkapellusch/Agent-Orchestration.git ~/agent-orchestration
-export PATH="$HOME/agent-orchestration:$PATH"  # Add to ~/.zshrc or ~/.bashrc
-opencode auth login  # One-time OAuth setup
+curl -fsSL https://raw.githubusercontent.com/dkapellusch/Agent-Orchestration/main/install.sh | bash
 ```
 
-See [INSTALLATION.md](INSTALLATION.md) for detailed setup.
+This clones the repo, adds `ralph` and `ao` to your PATH, checks dependencies, and sets up shell aliases. Then restart your terminal and authenticate:
+
+```bash
+opencode auth login    # For OpenCode agent (Gemini, Claude, GPT)
+# and/or
+claude                 # For Claude Code agent
+```
+
+<details>
+<summary>Manual install</summary>
+
+```bash
+git clone https://github.com/dkapellusch/Agent-Orchestration.git ~/agent-orchestration
+export PATH="$HOME/agent-orchestration:$PATH"  # Add to ~/.zshrc or ~/.bashrc
+opencode auth login
+```
+
+</details>
+
+See [INSTALLATION.md](INSTALLATION.md) for detailed setup and configuration.
 
 ### Basic Usage
 
@@ -112,39 +129,15 @@ ao "Fix lint" --dir ~/project-b &
 wait
 ```
 
-### Optional: Convenient Aliases
+### Aliases
 
-**Quick setup** (recommended):
+The installer sets up `ao` and other aliases automatically. To add them manually or reconfigure, run:
+
 ```bash
 ./setup/ao.sh
 ```
 
-This script automatically adds aliases to your shell config. Or add them manually to `~/.zshrc` or `~/.bashrc`:
-
-```bash
-# Agent Orchestration aliases
-export PATH="$HOME/agent-orchestration:$PATH"
-
-alias ao='ralph loop'
-alias ao-models='ralph models'
-alias ao-cost='ralph cost'
-alias ao-stats='ralph stats'
-alias ao-agents='ralph agents'
-alias ao-cleanup='ralph cleanup'
-alias ao-gsd='gsd/gsd-runner'
-
-# Quick shortcuts
-alias ao-list='ralph loop --list'
-alias ao-help='ralph --help'
-```
-
-Then use:
-```bash
-ao "Fix the bug" --budget 5.00
-ao "Add tests" --tier medium
-ao-cost --days 7
-ao-models
-```
+Available aliases: `ao` (main command), `ao-models`, `ao-cost`, `ao-stats`, `ao-agents`, `ao-cleanup`.
 
 ## Core Concepts
 

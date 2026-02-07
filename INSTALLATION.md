@@ -31,7 +31,19 @@ This guide covers setting up the Agent Orchestration toolkit as a standalone ins
 
 ## Installation
 
-### 1. Clone the Repository
+### Quick Install (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dkapellusch/Agent-Orchestration/main/install.sh | bash
+```
+
+This handles cloning, PATH setup, aliases, and dependency checks. Restart your terminal after running.
+
+To customize the install location: `AO_INSTALL_DIR=~/my-dir curl -fsSL ... | bash`
+
+### Manual Install
+
+#### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/dkapellusch/Agent-Orchestration.git ~/agent-orchestration
