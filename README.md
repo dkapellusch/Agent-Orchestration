@@ -20,23 +20,63 @@ See [INSTALLATION.md](INSTALLATION.md) for detailed setup.
 
 ### Basic Usage
 
-Scripts work from the current directory by default, or use `--dir` to specify a path:
-
 ```bash
-# Work in current directory (cd to project first)
 cd ~/my-project
-ao "Fix all lint errors" --max 10
 
-# OR specify directory explicitly
-ao "Fix all lint errors" --max 10 --dir ~/my-project
+# Simple task - let it run until done
+ao "Fix all lint errors"
 
-# Other examples
-ao "Fix the authentication bug" --tier high --dir ~/other-project
-ao "Refactor auth module" --budget 5.00 --tier high  # uses pwd
-ao "Implement feature" --sandbox anthropic --dir ~/project
+# Cap iterations and set a budget
+ao "Fix all lint errors" --max 10 --budget 2.00
 
 # Use Claude Code instead of OpenCode
-ao "Fix bugs" --agent cc --tier medium
+ao "Fix all lint errors" --agent cc
+```
+
+### Examples
+
+```bash
+# Thorough codebase cleanup: Claude Code, at least 5 iterations, fresh context
+# every iteration, up to 20 attempts, isolated in Docker
+ao "Address all issues found in this repo" \
+  --agent cc --min 5 --reset 1 --max 20 --sandbox docker
+
+# Quick bug fix with cost guard: medium tier, small budget, stop fast
+ao "Fix the null pointer in src/auth/login.ts" \
+  --tier medium --max 5 --budget 1.00
+
+# Large feature with a spec file: high tier models, generous budget,
+# validate completion with a second agent pass
+ao --file feature-spec.md \
+  --tier high --max 30 --budget 10.00 --completion-mode validate
+
+# Overnight refactor: infinite iterations, reset context every 3 loops,
+# sandboxed, high budget ceiling
+ao "Refactor all database queries to use the new ORM" \
+  --max 0 --reset 3 --budget 25.00 --sandbox anthropic
+
+# Fast lint/format pass: low tier (cheap/fast), few iterations, no sandbox
+ao "Run eslint --fix and prettier on all source files" \
+  --tier low --max 3 --sandbox none
+
+# Resume a previous session that was interrupted
+ao --session swift-fox-runs
+
+# Inject context into a running session from another terminal
+ao --add-context "Focus on the edge case where user.email is null" \
+  --session swift-fox-runs
+
+# Target a specific model instead of a tier
+ao "Optimize the hot path in src/engine.ts" \
+  --model anthropic/claude-opus-4-5 --max 10
+
+# Mount extra write paths when sandboxed
+ao "Generate API docs into ~/docs" \
+  --sandbox anthropic --allow-write ~/docs
+
+# Pass MCP server config for tool access
+ao "Query the database and fix schema drift" \
+  --mcp-config ./mcp-servers.json --tier high
 ```
 
 ### Execution Modes
@@ -51,28 +91,25 @@ ao "Fix all bugs" --max 10
 ao -m gsd new                    # Start new project
 ao -m gsd plan 1                 # Plan phase 1
 ao -m gsd execute 1 --tier high  # Execute phase 1
+ao -m gsd verify 1               # Verify results
 ```
 
-### Usage Patterns
+### Working Directory
 
-**Pattern 1: cd to project** (recommended for interactive use)
+Scripts work from the current directory by default, or use `--dir` to specify a path:
+
 ```bash
+# Pattern 1: cd to project (recommended for interactive use)
 cd ~/my-project
 ao "Fix the bug"
-ao "Add tests" --tier medium
-```
 
-**Pattern 2: Specify --dir** (useful for scripts/automation)
-```bash
+# Pattern 2: specify --dir (useful for scripts/automation)
 ao "Fix the bug" --dir ~/my-project
-ao "Add tests" --tier medium --dir ~/other-project
-```
 
-**Pattern 3: Add to PATH** (use from anywhere)
-```bash
-export PATH="$HOME/agent-orchestration:$PATH"
-# Now commands work from any location
-ao "Fix the bug" --dir ~/any/project
+# Pattern 3: run multiple projects from anywhere
+ao "Add tests" --dir ~/project-a &
+ao "Fix lint" --dir ~/project-b &
+wait
 ```
 
 ### Optional: Convenient Aliases
@@ -459,85 +496,160 @@ Real OpenCode CLI
 
 ## Advanced Usage
 
-### Custom Completion Detection
+### Recommended Patterns
+
+**Thorough autonomous work** (code cleanup, audits, large refactors):
+```bash
+ao "Address all lint and type errors in this repo" \
+  --agent cc --min 5 --reset 1 --max 20 --sandbox docker
+```
+- `--min 5` prevents premature completion (agent must run at least 5 iterations)
+- `--reset 1` clears context every iteration for fresh analysis (avoids fixating on stale approaches)
+- `--sandbox docker` isolates execution so the agent can't break your host
+
+**Supervised feature development** (new features, complex changes):
+```bash
+ao --file feature-spec.md \
+  --tier high --max 15 --budget 8.00 --completion-mode validate
+```
+- `--file` loads a detailed spec so the agent knows exactly what to build
+- `--completion-mode validate` runs a second agent to verify the work before marking complete
+- `--budget` prevents runaway costs
+
+**Quick fixes** (linting, formatting, small bugs):
+```bash
+ao "Fix the broken import in src/utils/index.ts" \
+  --tier low --max 3 --sandbox none
+```
+- `--tier low` uses fast/cheap models (Haiku, Gemini Flash)
+- `--max 3` stops quickly if it can't figure it out
+- `--sandbox none` avoids overhead for low-risk work
+
+**Overnight / unattended runs**:
+```bash
+ao "Migrate all API endpoints from v1 to v2 format" \
+  --max 0 --reset 3 --budget 25.00 --sandbox anthropic --tier high
+```
+- `--max 0` means infinite iterations (runs until done or budget exhausted)
+- `--reset 3` forces fresh context periodically so it doesn't get stuck in loops
+- `--budget 25.00` is the hard stop that protects your wallet
+
+### Completion Detection
 
 ```bash
-ao --promise "ALL TESTS PASS" --file task.md --dir ~/project
+# Default: agent must output <promise>COMPLETE</promise>
+ao "Fix all tests" --max 10
+
+# Custom marker text
+ao --promise "ALL TESTS PASS" --file task.md
 # Agent must output: <promise>ALL TESTS PASS</promise>
+
+# Validate mode: marker + a validator agent confirms completion
+ao "Implement auth" --completion-mode validate --tier high
 ```
 
-### Completion Modes
-
-Control how completion is detected:
+### Claude Code vs OpenCode
 
 ```bash
-# Promise only (default) - deterministic, requires exact marker
-ao "Task" --completion-mode promise
+# OpenCode (default) - supports Gemini, Claude, GPT via OAuth
+ao "Fix bugs" --agent oc --tier medium
 
-# Validate - marker + validator agent confirms completion
-ao "Task" --completion-mode validate
-```
-
-### Claude Code Agent
-
-Use Claude Code CLI instead of OpenCode:
-
-```bash
-# Claude Code with streaming output (shows thinking, tool uses)
+# Claude Code - Anthropic's official CLI, streaming output
 ao "Fix bugs" --agent cc --tier medium
-
-# Output shows:
-# 💭 [thinking] Analyzing the code...
-# 🔧 [tool:Read] {"file_path":"src/main.ts"}
-# 📋 [result] File contents...
-# ✅ Done (15s, $0.03)
+# Output shows thinking, tool use, and results in real-time
 ```
+
+Use `--agent cc` when you want Claude-specific features (thinking, tool streaming) or when OpenCode is rate-limited. Use `--agent oc` (default) for multi-provider fallback.
 
 ### Session Lifecycle
 
 ```bash
-# Start session (gets unique ID like swift-fox-runs)
-ralph loop "Task" --dir ~/project
+# Start a session (gets unique ID like swift-fox-runs)
+ao "Refactor the auth module" --tier high
 
-# Mid-loop: inject context
-ralph loop --add-context "Focus on error handling" --session swift-fox-runs
+# In another terminal: check progress
+ao --status --session swift-fox-runs
 
-# View progress
-ralph loop --status --session swift-fox-runs
+# Inject context mid-run (agent sees this next iteration)
+ao --add-context "The JWT secret is in .env, not hardcoded" \
+  --session swift-fox-runs
 
-# Resume if stopped
-ralph loop --session swift-fox-runs
+# If you Ctrl+C, resume where you left off
+ao --session swift-fox-runs
 
-# Clean up old sessions
-ralph cleanup
+# List all sessions across all projects
+ao --list
+
+# Clean up sessions older than 7 days
+ralph cleanup --days 7
 ```
 
-### State Reset for Long Runs
+### State Reset
 
-By default, agent state resets every 5 iterations to force fresh analysis and prevent stale context:
+Agent state (`state.md` and `history.json`) resets every 5 iterations by default. This prevents the agent from accumulating stale context:
 
 ```bash
-# Default behavior (resets every 5 iterations)
-ao --max 50 --file task.md --dir ~/project
+# Default: reset every 5 iterations
+ao "Big refactor" --max 50
 
-# Disable state reset
-ao --reset 0 --max 50 --file task.md --dir ~/project
+# Reset every iteration (fresh eyes each time, best for cleanup tasks)
+ao "Fix all issues" --reset 1 --max 20
 
-# Custom reset interval
-ao --reset 10 --max 50 --file task.md --dir ~/project
+# Never reset (agent keeps full memory, good for complex multi-step features)
+ao "Build the payment system" --reset 0 --max 30
+
+# Reset every 10 (compromise for long runs)
+ao "Migrate database" --reset 10 --max 100
 ```
 
-**What gets reset**: `state.md` (agent's notes) and `history.json` (struggle indicators)
-
-### Docker Sandbox Setup
+### Sandbox Setup
 
 ```bash
-# One-time setup
-opencode auth login
-./setup/contai.sh  # Clones contai repo, builds image
+# Auto-detect best available sandbox
+ao "Task" --sandbox auto
 
-# Use sandbox
-ralph loop --sandbox docker --file task.md --dir ~/project
+# Anthropic sandbox (lightweight, recommended)
+npm install -g @anthropic-ai/sandbox-runtime  # one-time
+ao "Task" --sandbox anthropic
+
+# Docker sandbox (heavy isolation, supports OpenCode agents)
+./setup/contai.sh  # one-time: clones contai, builds image
+ao "Task" --sandbox docker
+
+# Grant additional write paths when sandboxed
+ao "Generate docs" --sandbox anthropic --allow-write ~/docs --allow-write ~/output
+
+# Build a project-specific container from a Dockerfile
+ao "Task" --sandbox docker --build-container ./Dockerfile.dev
+
+# No sandbox (direct host execution)
+ao "Task" --sandbox none
+```
+
+### MCP Server Integration
+
+```bash
+# Pass MCP config so the agent has access to external tools
+ao "Query the prod database and fix the schema drift" \
+  --mcp-config ./mcp-servers.json --tier high
+
+# MCP config is forwarded to whichever agent runs:
+# - Claude Code: passed via --mcp-config flag
+# - OpenCode: mounted to ~/.config/opencode/mcp.json
+```
+
+### Parallel Execution
+
+Run multiple sessions concurrently across different projects:
+
+```bash
+# Background multiple tasks
+ao "Fix lint errors" --dir ~/project-a --budget 3.00 &
+ao "Add unit tests" --dir ~/project-b --budget 5.00 &
+ao "Update dependencies" --dir ~/project-c --tier low &
+wait
+
+# Rate limiting is shared: all sessions respect the same model concurrency limits
 ```
 
 ## Requirements
