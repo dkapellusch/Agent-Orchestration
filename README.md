@@ -551,6 +551,18 @@ ralph loop --sandbox docker --file task.md --dir ~/project
 - **Node.js 18+** - For Anthropic sandbox runtime
 - **flock** - File locking (included on Linux, `brew install flock` on macOS)
 
+## Acknowledgements
+
+This project builds on ideas and tools from the AI-assisted development community:
+
+- [everything is a ralph loop](https://ghuntley.com/loop/) - Geoff Huntley's original concept of iterative agent loops
+- [Ralph Wiggum as a "software engineer"](https://ghuntley.com/ralph/) - The foundational blog post on autonomous AI coding loops
+- [how to build a coding agent](https://ghuntley.com/agent/) - Geoff Huntley's free workshop on building coding agents
+- [Get Shit Done (GSD)](https://github.com/glittercowboy/get-shit-done) - Spec-driven development framework for Claude Code
+- [OpenCode](https://opencode.ai/) - Open source AI coding agent ([GitHub](https://github.com/opencode-ai/opencode))
+- [Claude Code](https://github.com/anthropics/claude-code) - Anthropic's agentic coding tool
+- [Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices) - Anthropic's guide to agentic coding
+
 ## License
 
 MIT - See [LICENSE](LICENSE)
