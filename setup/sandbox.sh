@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# setup-contai - Set up sandboxed agent execution with opencode
+# setup-sandbox - Set up sandboxed agent execution with opencode
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RALPH_ROOT="$(dirname "$SCRIPT_DIR")"
-CONTAI_DIR="$SCRIPT_DIR/contai"
+SANDBOX_DIR="$SCRIPT_DIR/contai"
 CONTAI_REPO="https://github.com/frequenz-floss/contai.git"
 OPENCODE_AUTH_DIR="$HOME/.local/share/opencode"
 WRAPPERS_DIR="$RALPH_ROOT/wrappers"
@@ -45,14 +45,14 @@ if [[ ! -f "$OPENCODE_AUTH_DIR/auth.json" ]]; then
 fi
 
 # Clone or update contai
-if [[ -d "$CONTAI_DIR" ]]; then
+if [[ -d "$SANDBOX_DIR" ]]; then
     echo "Updating existing contai installation..."
-    cd "$CONTAI_DIR"
+    cd "$SANDBOX_DIR"
     git pull
 else
     echo "Cloning contai repository..."
-    git clone "$CONTAI_REPO" "$CONTAI_DIR"
-    cd "$CONTAI_DIR"
+    git clone "$CONTAI_REPO" "$SANDBOX_DIR"
+    cd "$SANDBOX_DIR"
 fi
 
 echo ""
@@ -66,7 +66,7 @@ cd "$SCRIPT_DIR"
 # Build custom image with opencode and plugins
 docker build \
     --build-arg BASE_IMAGE=contai:latest \
-    -t contai-opencode:latest \
+    -t agent-sandbox:latest \
     -f Dockerfile.opencode \
     .
 
@@ -74,9 +74,9 @@ echo ""
 echo "Setup complete!"
 echo ""
 echo "OpenCode auth directory: $OPENCODE_AUTH_DIR"
-echo "Contai installation: $CONTAI_DIR"
-echo "Custom image: contai-opencode:latest"
-echo "Wrapper script: $WRAPPERS_DIR/contai-opencode"
+echo "Contai installation: $SANDBOX_DIR"
+echo "Custom image: agent-sandbox:latest"
+echo "Wrapper script: $WRAPPERS_DIR/agent-sandbox"
 echo ""
 echo "Usage:"
 echo "  ralph loop \"Your prompt\" --sandbox docker --dir /path/to/project"

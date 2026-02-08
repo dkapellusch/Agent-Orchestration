@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# docker-entrypoint.sh - Entrypoint for contai-opencode container
+# docker-entrypoint.sh - Entrypoint for agent-sandbox container
 # Syncs shared agents before running command
 
 set -euo pipefail

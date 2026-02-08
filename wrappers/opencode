@@ -18,7 +18,7 @@
 #   GSD_MCP_CONFIG    - Path to MCP config file (Claude format)
 #   GSD_OPENCODE_MCP_CONFIG - Path to converted OpenCode MCP config
 #   GSD_EXTRA_MOUNTS  - Space-separated extra mount paths
-#   CONTAI_IMAGE      - Container image to use
+#   SANDBOX_IMAGE     - Container image to use
 
 set -euo pipefail
 
@@ -154,22 +154,21 @@ main() {
 	output_file=$(mktemp)
 
 	if [[ "$SANDBOX" == "true" ]]; then
-		local contai_script="$ORCHESTRATOR_DIR/wrappers/contai-opencode"
-		[[ -f "$contai_script" ]] || contai_script="$ORCHESTRATOR_DIR/contai-opencode"
-		if [[ -f "$contai_script" ]]; then
-			# Build contai arguments from environment
-			local contai_args=()
-			[[ -n "${CONTAI_IMAGE:-}" ]] && contai_args+=(--image "$CONTAI_IMAGE")
-			[[ -n "${GSD_MCP_CONFIG:-}" ]] && contai_args+=(--mcp-config "$GSD_MCP_CONFIG")
-			[[ -n "${GSD_OPENCODE_MCP_CONFIG:-}" ]] && contai_args+=(--opencode-mcp-config "$GSD_OPENCODE_MCP_CONFIG")
+		local sandbox_script="$ORCHESTRATOR_DIR/wrappers/agent-sandbox"
+		[[ -f "$sandbox_script" ]] || sandbox_script="$ORCHESTRATOR_DIR/agent-sandbox"
+		if [[ -f "$sandbox_script" ]]; then
+			local sandbox_args=()
+			[[ -n "${SANDBOX_IMAGE:-}" ]] && sandbox_args+=(--image "$SANDBOX_IMAGE")
+			[[ -n "${GSD_MCP_CONFIG:-}" ]] && sandbox_args+=(--mcp-config "$GSD_MCP_CONFIG")
+			[[ -n "${GSD_OPENCODE_MCP_CONFIG:-}" ]] && sandbox_args+=(--opencode-mcp-config "$GSD_OPENCODE_MCP_CONFIG")
 			if [[ -n "${GSD_EXTRA_MOUNTS:-}" ]]; then
 				for mount in $GSD_EXTRA_MOUNTS; do
-					contai_args+=(--extra-mount "$mount")
+					sandbox_args+=(--extra-mount "$mount")
 				done
 			fi
-			"$contai_script" "${contai_args[@]}" opencode "${original_args[@]}" 2>&1 | tee "$output_file" || exit_code=$?
+			"$sandbox_script" "${sandbox_args[@]}" opencode "${original_args[@]}" 2>&1 | tee "$output_file" || exit_code=$?
 		else
-			echo "Warning: Sandbox enabled but contai-opencode not found, running without sandbox" >&2
+			echo "Warning: Sandbox enabled but agent-sandbox not found, running without sandbox" >&2
 			"$real_opencode" "${original_args[@]}" 2>&1 | tee "$output_file" || exit_code=$?
 		fi
 	else

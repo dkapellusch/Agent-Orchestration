@@ -29,7 +29,8 @@ show_models_for_agent() {
     local agent=$1
     local tier description model until remaining mins secs
     echo "[$agent]"
-    echo "$(printf '=%.0s' {1..40})"
+    printf '=%.0s' {1..40}
+    echo
 
     for tier in high medium low; do
         description=$(jq -r --arg agent "$agent" --arg tier "$tier" '.agents[$agent].tiers[$tier].description // .tiers[$tier].description // ($tier + " tier")' "$CONFIG")

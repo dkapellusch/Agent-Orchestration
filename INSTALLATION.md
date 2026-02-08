@@ -103,10 +103,10 @@ For isolated execution in containers:
 
 ```bash
 # Build the container image
-./setup/contai.sh
+./setup/sandbox.sh
 
 # Test container execution
-./wrappers/contai-opencode --help
+./wrappers/agent-sandbox --help
 ```
 
 ### Anthropic Sandbox Runtime
@@ -210,7 +210,7 @@ Allowlists for Anthropic sandbox execution:
 ├── wrappers/               # CLI wrappers
 ├── setup/                  # Setup scripts
 │   ├── ao.sh               # Alias installation
-│   └── contai.sh           # Docker sandbox setup
+│   └── sandbox.sh          # Docker sandbox setup
 ├── gsd/                    # GSD integration
 ├── agents/                 # Shared agent definitions
 └── specs/                  # Design documentation

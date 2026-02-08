@@ -1,4 +1,4 @@
-# Custom container image with opencode and full dev environment
+# Custom agent-sandbox image with opencode and full dev environment
 # Based on contai base image, adds:
 # - OpenCode CLI with authentication plugins
 # - Anthropic sandbox-runtime (srt) for network/filesystem isolation

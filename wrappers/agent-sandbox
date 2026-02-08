@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# contai-opencode - Run contai with opencode/claude auth and config mounted
+# agent-sandbox - Run sandboxed container with opencode/claude auth and config mounted
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +13,7 @@ OPENCODE_CONFIG_DIR="$RALPH_ROOT/opencode-config"
 CONTAINER_HOME="/home/agent"
 
 # Container image (can be overridden via env var or --image flag)
-CONTAINER_IMAGE="${CONTAI_IMAGE:-contai-opencode:latest}"
+CONTAINER_IMAGE="${SANDBOX_IMAGE:-agent-sandbox:latest}"
 
 # Parse flags
 WORK_DIR="$(pwd)"

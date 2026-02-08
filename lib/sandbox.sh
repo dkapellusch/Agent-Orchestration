@@ -54,8 +54,8 @@ check_sandbox_setup() {
 	local contai_script=$1
 
 	if [[ ! -f "$contai_script" ]]; then
-		echo "Error: Sandbox mode requires contai to be set up."
-		echo "Run: ./setup-contai"
+		echo "Error: Sandbox mode requires agent-sandbox to be set up."
+		echo "Run: ./setup/sandbox.sh"
 		return 1
 	fi
 

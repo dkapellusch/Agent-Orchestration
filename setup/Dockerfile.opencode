@@ -2,7 +2,7 @@ ARG BASE_IMAGE=contai:latest
 
 FROM ${BASE_IMAGE}
 
-# The base contai image already has opencode-ai and claude installed,
+# Agent sandbox image. The base contai image already has opencode-ai and claude installed,
 # and already creates a user matching the host's UID/GID for proper
 # file permission handling. We don't need to create another user.
 

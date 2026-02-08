@@ -224,7 +224,7 @@ ralph loop "Task" --sandbox auto --dir ~/project
 ralph loop "Task" --sandbox anthropic --dir ~/project
 
 # Docker sandbox (heavy isolation)
-./setup/contai.sh  # One-time setup
+./setup/sandbox.sh  # One-time setup
 ralph loop "Task" --sandbox docker --dir ~/project
 
 # Grant additional write paths
@@ -250,7 +250,7 @@ ralph agents validate              # Validate definitions
 ralph agents sync --dir ~/project  # Sync to project
 ```
 
-**Auto-sync**: All orchestrators (`ralph loop`, `gsd-runner`, `contai-opencode`) automatically sync agents before execution.
+**Auto-sync**: All orchestrators (`ralph loop`, `gsd-runner`, `agent-sandbox`) automatically sync agents before execution.
 
 ### 6. GSD (Get Shit Done) - Spec-Driven Development
 
@@ -446,7 +446,7 @@ Agent-Orchestration/
 │   ├── install.sh, gsd-runner
 ├── setup/                       # Setup scripts
 │   ├── ao.sh                    # Alias installation
-│   └── contai.sh                # Docker sandbox setup
+│   └── sandbox.sh               # Docker sandbox setup
 └── state/                       # Runtime state (created on first run)
     ├── rate-limits.json
     └── ralph/{session}/         # Session history
@@ -606,7 +606,7 @@ npm install -g @anthropic-ai/sandbox-runtime  # one-time
 ao "Task" --sandbox anthropic
 
 # Docker sandbox (heavy isolation, supports OpenCode agents)
-./setup/contai.sh  # one-time: clones contai, builds image
+./setup/sandbox.sh  # one-time: clones contai, builds image
 ao "Task" --sandbox docker
 
 # Grant additional write paths when sandboxed

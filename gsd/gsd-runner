@@ -51,7 +51,7 @@ MODEL=""
 MCP_CONFIG=""
 BUILD_CONTAINER=""
 EXTRA_ALLOW_WRITE=()
-CONTAINER_IMAGE="contai-opencode:latest"
+CONTAINER_IMAGE="agent-sandbox:latest"
 # TEMP_DOCKERFILE and OPENCODE_MCP_CONFIG_FILE are initialized before trap registration
 
 usage() {
@@ -134,8 +134,8 @@ fi
 
 # Check sandbox prerequisites if enabled
 if [[ "$SANDBOX" == "true" ]]; then
-	CONTAI_SCRIPT="$ORCHESTRATOR_DIR/wrappers/contai-opencode"
-	check_sandbox_setup "$CONTAI_SCRIPT" || exit 1
+	SANDBOX_SCRIPT="$ORCHESTRATOR_DIR/wrappers/agent-sandbox"
+	check_sandbox_setup "$SANDBOX_SCRIPT" || exit 1
 fi
 
 # Build project-specific container if requested
@@ -162,16 +162,16 @@ if [[ -n "$BUILD_CONTAINER" ]]; then
 	fi
 
 	PROJECT_NAME=$(basename "$WORKING_DIR" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
-	CONTAINER_IMAGE="contai-${PROJECT_NAME}:latest"
+	CONTAINER_IMAGE="agent-sandbox-${PROJECT_NAME}:latest"
 
 	echo "Building project container: $CONTAINER_IMAGE"
 
-	if grep -q "^FROM contai-opencode" "$DOCKERFILE_PATH"; then
+	if grep -q "^FROM agent-sandbox" "$DOCKERFILE_PATH"; then
 		docker build -f "$DOCKERFILE_PATH" -t "$CONTAINER_IMAGE" "$WORKING_DIR" || exit 1
 	else
 		TEMP_DOCKERFILE=$(mktemp)
 		cat > "$TEMP_DOCKERFILE" <<DOCKERFILE_EOF
-FROM contai-opencode:latest
+FROM agent-sandbox:latest
 $(grep -v "^FROM " "$DOCKERFILE_PATH" | grep -v "^#" || true)
 DOCKERFILE_EOF
 		docker build -f "$TEMP_DOCKERFILE" -t "$CONTAINER_IMAGE" "$WORKING_DIR" || { rm -f "$TEMP_DOCKERFILE"; exit 1; }
@@ -230,7 +230,7 @@ export GSD_SANDBOX="$SANDBOX"
 export GSD_CONFIG="$ORCHESTRATOR_DIR/config/models.json"
 export GSD_STATE_DIR="$ORCHESTRATOR_DIR/state"
 export GSD_WRAPPER_ENABLED="true"
-export CONTAI_IMAGE="$CONTAINER_IMAGE"
+export SANDBOX_IMAGE="$CONTAINER_IMAGE"
 [[ -n "$MCP_CONFIG" ]] && export GSD_MCP_CONFIG="$MCP_CONFIG"
 [[ -n "$OPENCODE_MCP_CONFIG_FILE" ]] && export GSD_OPENCODE_MCP_CONFIG="$OPENCODE_MCP_CONFIG_FILE"
 if [[ ${#EXTRA_ALLOW_WRITE[@]} -gt 0 ]]; then
@@ -277,14 +277,14 @@ if [[ "$AGENT" == "claudecode" ]]; then
 	CLAUDE_FLAGS=("-p" "--dangerously-skip-permissions" "--model" "$claude_model")
 
 	if [[ "$SANDBOX" == "true" ]]; then
-		"$CONTAI_SCRIPT" --dir "$WORKING_DIR" claude "${CLAUDE_FLAGS[@]}" "$GSD_PROMPT" || EXIT_CODE=$?
+		"$SANDBOX_SCRIPT" --dir "$WORKING_DIR" claude "${CLAUDE_FLAGS[@]}" "$GSD_PROMPT" || EXIT_CODE=$?
 	else
 		claude "${CLAUDE_FLAGS[@]}" "$GSD_PROMPT" || EXIT_CODE=$?
 	fi
 else
 	# OpenCode (default)
 	if [[ "$SANDBOX" == "true" ]]; then
-		"$CONTAI_SCRIPT" --dir "$WORKING_DIR" opencode run --model "$MODEL" --agent yolo "$GSD_PROMPT" || EXIT_CODE=$?
+		"$SANDBOX_SCRIPT" --dir "$WORKING_DIR" opencode run --model "$MODEL" --agent yolo "$GSD_PROMPT" || EXIT_CODE=$?
 	else
 		opencode run --model "$MODEL" --agent yolo "$GSD_PROMPT" || EXIT_CODE=$?
 	fi
