@@ -3,6 +3,8 @@
     "allowedDomains": [
       "api.anthropic.com",
       "api.openai.com",
+      "opencode.ai",
+      "*.opencode.ai",
       "generativelanguage.googleapis.com",
       "*.googleapis.com",
       "models.dev",

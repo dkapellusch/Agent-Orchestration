@@ -142,16 +142,19 @@ while IFS= read -r line; do
             ;;
         step_finish)
             # Show cost on final step (reason=stop means conversation ended)
-            info=$(jq -r \
-                --arg rst "$RST" --arg bold "$BOLD" --arg grn "$GRN" --arg gry "$GRY" '
-                .part as $p |
-                if $p.reason == "stop" then
-                    "\n" + $grn + $bold + "✅ Done" + $rst + " " +
-                    $gry + "($" + ($p.cost // 0 | tostring) +
-                    ", " + (($p.tokens.input // 0) + ($p.tokens.output // 0) | tostring) + " tokens)" + $rst
-                else empty end
-                ' <<< "$line" 2>/dev/null)
-            [[ -n "$info" ]] && echo "$info"
+            # Validate JSON first to avoid jq parse errors
+            if echo "$line" | jq -e '.part' &>/dev/null; then
+                info=$(jq -r \
+                    --arg rst "$RST" --arg bold "$BOLD" --arg grn "$GRN" --arg gry "$GRY" '
+                    .part as $p |
+                    if $p.reason == "stop" then
+                        "\n" + $grn + $bold + "✅ Done" + $rst + " " +
+                        $gry + "($" + ($p.cost // 0 | tostring) +
+                        ", " + (($p.tokens.input // 0) + ($p.tokens.output // 0) | tostring) + " tokens)" + $rst
+                    else empty end
+                    ' <<< "$line" 2>/dev/null)
+                [[ -n "$info" ]] && echo "$info"
+            fi
             ;;
     esac
 done

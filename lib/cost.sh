@@ -38,12 +38,20 @@ _get_opencode_session_data() {
 		in_step && /\"write\":/ { match($0, /[0-9]+/); cache_write += substr($0, RSTART, RLENGTH) }
 		in_step && lines_after > 15 { in_step=0 }
 		END {
-			printf "{\"cost\":%.10f,\"tokens\":{\"input\":%d,\"output\":%d,\"cacheRead\":%d,\"cacheWrite\":%d}}",
-				total_cost+0, input+0, output+0, cache_read+0, cache_write+0
+			cost = total_cost+0
+			inp = input+0
+			out = output+0
+			cr = cache_read+0
+			cw = cache_write+0
+			printf "{\"cost\":%f,\"tokens\":{\"input\":%d,\"output\":%d,\"cacheRead\":%d,\"cacheWrite\":%d}}\n", cost, inp, out, cr, cw
 		}
 	') || true
 
-	echo "${result:-{\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0}}}"
+	if [[ -n "$result" ]]; then
+		echo "$result"
+	else
+		echo '{"cost":0,"tokens":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}'
+	fi
 }
 
 # Extract cost from an OpenCode session
@@ -63,9 +71,14 @@ get_opencode_session_cost() {
 # Always returns exit code 0 to avoid breaking set -e scripts
 get_opencode_session_tokens() {
 	local session_id="$1"
-	local data
+	local data tokens
 	data=$(_get_opencode_session_data "$session_id")
-	echo "$data" | jq -c '.tokens // {"input":0,"output":0,"cacheRead":0,"cacheWrite":0}'
+	tokens=$(echo "$data" | jq -c '.tokens // {"input":0,"output":0,"cacheRead":0,"cacheWrite":0}' 2>/dev/null)
+	if [[ -n "$tokens" ]]; then
+		echo "$tokens"
+	else
+		echo '{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}'
+	fi
 }
 
 # ============================================================================
