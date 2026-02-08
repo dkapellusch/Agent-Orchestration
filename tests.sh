@@ -1334,11 +1334,33 @@ EOF
 		fail "wrappers/opencode has syntax errors"
 	fi
 
-	log_test "wrappers/contai-opencode has valid bash syntax"
-	if bash -n "$SCRIPT_DIR/wrappers/contai-opencode" 2>/dev/null; then
+	log_test "wrappers/agent-sandbox has valid bash syntax"
+	if bash -n "$SCRIPT_DIR/wrappers/agent-sandbox" 2>/dev/null; then
 		pass
 	else
-		fail "wrappers/contai-opencode has syntax errors"
+		fail "wrappers/agent-sandbox has syntax errors"
+	fi
+
+	log_test "default container image name is consistent across all files"
+	# The setup script builds 'agent-sandbox:latest', and all consumers must default to the same name.
+	# This catches rename-missed-a-spot bugs where one file still references an old image name.
+	expected_image="agent-sandbox:latest"
+	files_with_default=(
+		"$SCRIPT_DIR/wrappers/agent-sandbox"
+		"$SCRIPT_DIR/cmd/loop.sh"
+		"$SCRIPT_DIR/gsd/gsd-runner"
+		"$SCRIPT_DIR/setup/sandbox.sh"
+	)
+	all_consistent=true
+	for f in "${files_with_default[@]}"; do
+		if ! grep -q "$expected_image" "$f" 2>/dev/null; then
+			all_consistent=false
+			fail "$(basename "$f") does not reference default image '$expected_image'"
+			break
+		fi
+	done
+	if [[ "$all_consistent" == "true" ]]; then
+		pass
 	fi
 
 	log_test "wrappers/opencode can be sourced without error"

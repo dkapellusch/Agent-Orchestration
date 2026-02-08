@@ -56,7 +56,7 @@ acquire_lock() {
 			echo "ERROR: Could not acquire lock on $lockfile" >&2
 			return 1
 		fi
-		sleep 0.$(($RANDOM % 100 + 10))
+		sleep 0.$((RANDOM % 100 + 10))
 	done
 
 	# Write PID and timestamp immediately after mkdir succeeds (before any other logic)
@@ -219,7 +219,7 @@ get_file_mtime() {
 get_cutoff_date() {
 	local days="${1:-30}"
 	if [[ "$_UNAME_CACHE" == "Darwin" ]]; then
-		date -v-${days}d +%Y-%m-%d 2>/dev/null
+		date -v-"${days}"d +%Y-%m-%d 2>/dev/null
 	else
 		date -d "$days days ago" +%Y-%m-%d 2>/dev/null
 	fi

@@ -120,7 +120,7 @@ Before outputting:
 | `lib/oc-formatter.sh` | Formats OpenCode JSON output |
 | `lib/mcp-convert.sh` | Converts MCP configs between Claude/OpenCode formats |
 | `gsd/gsd-runner` | GSD workflow executor |
-| `wrappers/contai-opencode` | Docker container wrapper with auth forwarding |
+| `wrappers/agent-sandbox` | Docker container wrapper with auth forwarding |
 | `config/models.json` | Model tiers and settings |
 | `tests.sh` | Test suite - run with `./tests.sh` |
 

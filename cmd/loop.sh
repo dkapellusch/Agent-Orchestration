@@ -19,7 +19,7 @@ source "$RALPH_ROOT/lib/cost.sh"
 
 CONFIG="$RALPH_CONFIG"
 SANDBOX_CONFIG="$RALPH_SANDBOX_CONFIG"
-CONTAI_SCRIPT="$RALPH_ROOT/wrappers/contai-opencode"
+SANDBOX_SCRIPT="$RALPH_ROOT/wrappers/agent-sandbox"
 RATE_LIMITS="$RALPH_STATE_DIR/rate-limits.json"
 
 # ============================================================================
@@ -167,7 +167,7 @@ TEMP_SANDBOX_CONFIG=""
 BUDGET_LIMIT=""
 COMPLETION_MODE="promise"
 BUILD_CONTAINER=""
-CONTAINER_IMAGE="contai-opencode:latest"
+CONTAINER_IMAGE="agent-sandbox:latest"
 MCP_CONFIG=""
 VERBOSE=false
 
@@ -998,23 +998,23 @@ if [[ -n "$BUILD_CONTAINER" ]]; then
 
     # Generate project-specific image name from directory
     PROJECT_NAME=$(basename "$WORKING_DIR" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
-    CONTAINER_IMAGE="contai-${PROJECT_NAME}:latest"
+    CONTAINER_IMAGE="agent-sandbox-${PROJECT_NAME}:latest"
 
     echo "Building project container: $CONTAINER_IMAGE"
     echo "Dockerfile: $DOCKERFILE_PATH"
 
-    # Check if Dockerfile extends contai-opencode, if not create a wrapper
-    if grep -q "^FROM contai-opencode" "$DOCKERFILE_PATH"; then
-        # Dockerfile already extends contai-opencode, build directly
+    # Check if Dockerfile extends agent-sandbox, if not create a wrapper
+    if grep -q "^FROM agent-sandbox" "$DOCKERFILE_PATH"; then
+        # Dockerfile already extends agent-sandbox, build directly
         docker build -f "$DOCKERFILE_PATH" -t "$CONTAINER_IMAGE" "$WORKING_DIR" || {
             echo "Error: Container build failed"
             exit 1
         }
     else
-        # Create a temporary Dockerfile that extends contai-opencode then applies project Dockerfile
+        # Create a temporary Dockerfile that extends agent-sandbox then applies project Dockerfile
         TEMP_DOCKERFILE=$(mktemp)
         cat > "$TEMP_DOCKERFILE" <<DOCKERFILE_EOF
-FROM contai-opencode:latest
+FROM agent-sandbox:latest
 
 # Apply project Dockerfile commands
 $(grep -v "^FROM " "$DOCKERFILE_PATH" | grep -v "^#" || true)
@@ -1038,8 +1038,8 @@ EFFECTIVE_SANDBOX=$(get_effective_sandbox "$SANDBOX_MODE" "$AGENT")
 # Setup sandbox
 case "$EFFECTIVE_SANDBOX" in
     docker)
-        check_sandbox_setup "$CONTAI_SCRIPT" || exit 1
-        echo "Sandbox: Docker (contai-opencode)"
+        check_sandbox_setup "$SANDBOX_SCRIPT" || exit 1
+        echo "Sandbox: Docker (agent-sandbox)"
         if [[ ${#EXTRA_ALLOW_WRITE[@]} -gt 0 ]]; then
             echo "Extra mounts: ${EXTRA_ALLOW_WRITE[*]}"
         fi
@@ -1133,7 +1133,7 @@ if [[ $RESET_AFTER -gt 0 ]]; then
     echo "State reset: every $RESET_AFTER iterations"
 fi
 case "$EFFECTIVE_SANDBOX" in
-    docker)    echo "Sandbox:    Docker (contai-opencode)" ;;
+    docker)    echo "Sandbox:    Docker (agent-sandbox)" ;;
     anthropic) echo "Sandbox:    Anthropic (srt) - network/fs restricted" ;;
     claude)    echo "Sandbox:    Claude Code built-in" ;;
     none)      echo "Sandbox:    none (full system access)" ;;
@@ -1252,9 +1252,9 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     case "$EFFECTIVE_SANDBOX" in
         docker)
             if [[ "$AGENT" == "claudecode" ]]; then
-                { "$CONTAI_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
+                { "$SANDBOX_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
             else
-                { "$CONTAI_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
+                { "$SANDBOX_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
             fi
             ;;
         anthropic)
@@ -1417,7 +1417,7 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
             echo ""
             echo "Task completed in $iteration iteration(s)!"
             total_time=$(jq -r '.totalDurationMs // 0' "$HISTORY_FILE")
-            echo "Total time: $(format_duration $total_time)"
+            echo "Total time: $(format_duration "$total_time")"
 
             if [[ "$TOTAL_COST" != "0" ]]; then
                 printf "Total cost: \$%.4f" "$TOTAL_COST"
@@ -1493,7 +1493,7 @@ done
 echo ""
 echo "Max iterations ($MAX_ITERATIONS) reached"
 total_time=$(jq -r '.totalDurationMs // 0' "$HISTORY_FILE")
-echo "Total time: $(format_duration $total_time)"
+echo "Total time: $(format_duration "$total_time")"
 
 FINAL_TOTAL_COST=0
 if [[ "$AGENT" == "opencode" ]]; then
