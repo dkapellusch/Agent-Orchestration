@@ -1291,7 +1291,26 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
             if [[ $stall_duration -ge $STALL_TIMEOUT ]]; then
                 echo ""
                 echo "Agent stalled (no output for ${STALL_TIMEOUT}s) - killing process"
-                kill $CMD_PID 2>/dev/null || true
+                # Kill the entire pipeline process tree to prevent wait from hanging.
+                # CMD_PID is the formatter (last in pipeline), but the subshell running
+                # srt/agent and tee are siblings that must also die. Walk the full
+                # descendant tree of this script's children (only the pipeline is backgrounded).
+                local pids_to_kill=""
+                local queue
+                queue=$(pgrep -P $$ 2>/dev/null || true)
+                while [[ -n "$queue" ]]; do
+                    local next_queue=""
+                    for pid in $queue; do
+                        pids_to_kill="$pids_to_kill $pid"
+                        local children
+                        children=$(pgrep -P "$pid" 2>/dev/null || true)
+                        [[ -n "$children" ]] && next_queue="$next_queue $children"
+                    done
+                    queue="$next_queue"
+                done
+                if [[ -n "$pids_to_kill" ]]; then
+                    kill $pids_to_kill 2>/dev/null || true
+                fi
                 if [[ "$EFFECTIVE_SANDBOX" == "docker" ]]; then
                     docker ps -q --filter "ancestor=$CONTAINER_IMAGE" 2>/dev/null | xargs -r docker kill 2>/dev/null || true
                 fi
