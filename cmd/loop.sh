@@ -1165,6 +1165,7 @@ echo "=================================="
 
 # Main loop
 iteration=1
+log_seq=1
 consecutive_quick_failures=0
 # Absolute maximum for infinite mode to prevent runaway execution
 ABSOLUTE_MAX_ITERATIONS=1000
@@ -1202,7 +1203,7 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     full_prompt=$(build_mission_prompt "$iteration")
 
     start_time=$(date +%s)
-    OUTPUT_FILE="$RALPH_DIR/logs/iteration-${iteration}.log"
+    OUTPUT_FILE="$RALPH_DIR/logs/iteration-${log_seq}.log"
 
     STALLED=false
 
@@ -1272,13 +1273,12 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     # Use a temp file to capture the agent's actual exit code
     AGENT_EXIT_CODE_FILE="$RALPH_DIR/agent_exit_code.tmp"
 
-    # For OpenCode with Anthropic sandbox: write prompt to file and create wrapper to avoid shell quoting issues
-    PROMPT_FILE=""
-    WRAPPER_PROMPT=""
+    # For OpenCode with Anthropic sandbox: write prompt to file so srt -c can read it
+    # without shell quoting issues (OpenCode needs the prompt as a CLI arg, not stdin)
+    ITER_PROMPT_FILE=""
     if [[ "$AGENT" == "opencode" ]] && [[ "$EFFECTIVE_SANDBOX" == "anthropic" ]]; then
-        PROMPT_FILE="$RALPH_DIR/prompt-iter-${iteration}.txt"
-        printf '%s' "$full_prompt" > "$PROMPT_FILE"
-        WRAPPER_PROMPT="Read the file at $PROMPT_FILE and fully follow all instructions in it."
+        ITER_PROMPT_FILE="$RALPH_DIR/prompt-iter-${iteration}.txt"
+        printf '%s' "$full_prompt" > "$ITER_PROMPT_FILE"
     fi
 
     case "$EFFECTIVE_SANDBOX" in
@@ -1293,8 +1293,8 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
             if [[ "$AGENT" == "claudecode" ]]; then
                 { echo "$full_prompt" | srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_cc &
             else
-                # Use wrapper prompt to avoid shell quoting issues through srt
-                { srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" "$WRAPPER_PROMPT" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_oc &
+                # Use srt -c to read prompt from file, avoiding shell quoting issues
+                { srt --settings "$ACTIVE_SANDBOX_CONFIG" -c "${BASE_CMD[*]} \"\$(cat '$ITER_PROMPT_FILE')\"" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_oc &
             fi
             ;;
         claude|none)
@@ -1555,6 +1555,7 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
         clear_context
     fi
 
+    ((log_seq++))
     if [[ "$skip_increment" != "true" ]]; then
         ((iteration++))
         update_state "$iteration"
