@@ -21,13 +21,110 @@ fi
 # Model Selection
 # ============================================================================
 
+_DISCOVERED_OPENCODE_MODELS=""
+
+# Discover available opencode models dynamically
+# Runs `opencode models --verbose`, picks active+toolcall models released within
+# 9 months, keeps only the latest per family, filtered by enabled_providers from config.
+# Usage: discover_opencode_models [config_file]
+# Outputs one model ID per line (e.g. "anthropic/claude-opus-4-6")
+discover_opencode_models() {
+	if [[ -n "$_DISCOVERED_OPENCODE_MODELS" ]]; then
+		echo "$_DISCOVERED_OPENCODE_MODELS"
+		return 0
+	fi
+
+	local config_file=${1:-""}
+	local raw
+	raw=$(opencode models --verbose 2>/dev/null) || return 1
+	[[ -z "$raw" ]] && return 1
+
+	local cutoff
+	cutoff=$(date -v-9m +%Y-%m-%d 2>/dev/null || date -d '9 months ago' +%Y-%m-%d 2>/dev/null) || return 1
+
+	local providers_json="[]"
+	if [[ -n "$config_file" ]] && [[ -f "$config_file" ]]; then
+		providers_json=$(jq -c '.enabled_providers // []' "$config_file" 2>/dev/null || echo "[]")
+	fi
+
+	_DISCOVERED_OPENCODE_MODELS=$(echo "$raw" | sed 's/\x1b\[[0-9;]*m//g' | python3 -c "
+import sys, json, re
+from collections import defaultdict
+
+content = sys.stdin.read()
+cutoff = '$cutoff'
+providers = json.loads('$providers_json')
+lines = content.split('\n')
+models = []
+current_id = None
+current_json = ''
+
+for line in lines:
+    if re.match(r'^[a-zA-Z].*/', line) and not line.strip().startswith('{'):
+        if current_id and current_json.strip():
+            try:
+                obj = json.loads(current_json)
+                obj['_pm'] = current_id
+                models.append(obj)
+            except json.JSONDecodeError:
+                pass
+        current_id = line.strip()
+        current_json = ''
+    else:
+        current_json += line + '\n'
+if current_id and current_json.strip():
+    try:
+        obj = json.loads(current_json)
+        obj['_pm'] = current_id
+        models.append(obj)
+    except json.JSONDecodeError:
+        pass
+
+def matches_provider(pm, providers):
+    if not providers:
+        return True
+    prefix = pm.split('/')[0]
+    return prefix in providers
+
+filtered = [m for m in models
+    if m.get('status') == 'active'
+    and m.get('capabilities', {}).get('toolcall', False)
+    and not re.search(r'embed|tts|image|live|audio', m.get('_pm', ''), re.I)
+    and m.get('release_date', '') >= cutoff
+    and matches_provider(m.get('_pm', ''), providers)]
+
+families = defaultdict(list)
+for m in filtered:
+    families[m.get('family', 'unknown')].append(m)
+
+result = [max(members, key=lambda x: x.get('release_date', ''))
+          for members in families.values()]
+result.sort(key=lambda x: x.get('release_date', ''), reverse=True)
+
+for m in result:
+    print(m['_pm'])
+" 2>/dev/null) || return 1
+
+	[[ -z "$_DISCOVERED_OPENCODE_MODELS" ]] && return 1
+	echo "$_DISCOVERED_OPENCODE_MODELS"
+}
+
 # Get models for a tier from config (agent-aware)
 # Usage: get_models_for_tier "high" "/path/to/config.json" ["opencode"|"claudecode"]
 get_models_for_tier() {
 	local tier=$1
 	local config_file=$2
 	local agent=${3:-opencode}
-	# Try agent-specific config first, fall back to legacy .tiers for backwards compat
+
+	if [[ "$tier" == "all" && "$agent" == "opencode" ]]; then
+		local discovered
+		discovered=$(discover_opencode_models "$config_file" 2>/dev/null) || true
+		if [[ -n "$discovered" ]]; then
+			echo "$discovered"
+			return 0
+		fi
+	fi
+
 	jq -r --arg agent "$agent" --arg tier "$tier" '.agents[$agent].tiers[$tier].models[] // .tiers[$tier].models[] // empty' "$config_file"
 }
 
@@ -139,10 +236,10 @@ load_config_defaults() {
 	local config_file=$1
 
 	if [[ -f "$config_file" ]]; then
-		DEFAULT_TIER="high"
+		DEFAULT_TIER="default"
 		DEFAULT_COOLDOWN=$(jq -r '.defaults.cooldownSeconds // 900' "$config_file")
 	else
-		DEFAULT_TIER="high"
+		DEFAULT_TIER="default"
 		DEFAULT_COOLDOWN=900
 	fi
 }

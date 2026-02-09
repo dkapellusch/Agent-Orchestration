@@ -170,6 +170,7 @@ BUILD_CONTAINER=""
 CONTAINER_IMAGE="agent-sandbox:latest"
 MCP_CONFIG=""
 VERBOSE=false
+OUTPUT_MODE="normal"
 
 usage() {
     cat <<EOF
@@ -210,7 +211,11 @@ Options:
                         For OpenCode: mounted to ~/.config/opencode/mcp.json
   --add-context TEXT    Add context for next iteration (requires --session)
   --status              Show loop status and history
-  --verbose, -v         Show full output (no truncation of tool inputs/results)
+  --output MODE         Output mode: normal, brief, verbose (default: normal)
+                        normal: formatted agent output + iteration summaries
+                        brief: suppress agent output, show only summaries
+                        verbose: full output, no truncation
+  --verbose, -v         Shorthand for --output verbose
   -h, --help            Show this help
 
 GSD Commands (use with -m gsd):
@@ -288,7 +293,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --add-context) [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; ADD_CONTEXT="$2"; shift 2 ;;
         --status) SHOW_STATUS=true; shift ;;
-        --verbose|-v) VERBOSE=true; shift ;;
+        --output) [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; OUTPUT_MODE="$2"; shift 2 ;;
+        --verbose|-v) VERBOSE=true; OUTPUT_MODE="verbose"; shift ;;
         -h|--help) usage; exit 0 ;;
         -*) echo "Error: Unknown option: $1" >&2; exit 1 ;;
         *) PROMPT="$1"; shift ;;
@@ -419,6 +425,14 @@ fi
 if [[ "$COMPLETION_MODE" != "promise" && "$COMPLETION_MODE" != "validate" ]]; then
     echo "Error: Invalid completion mode '$COMPLETION_MODE'. Must be 'promise' or 'validate'" >&2
     exit 1
+fi
+
+if [[ "$OUTPUT_MODE" != "normal" && "$OUTPUT_MODE" != "brief" && "$OUTPUT_MODE" != "verbose" ]]; then
+    echo "Error: Invalid output mode '$OUTPUT_MODE'. Must be 'normal', 'brief', or 'verbose'" >&2
+    exit 1
+fi
+if [[ "$OUTPUT_MODE" == "verbose" ]]; then
+    VERBOSE=true
 fi
 
 # Initialize directories
@@ -1219,6 +1233,7 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     if [[ "$AGENT" == "opencode" ]] && [[ -n "$MCP_CONFIG" ]]; then
         source "$RALPH_ROOT/lib/mcp-convert.sh"
         OPENCODE_MCP_CONFIG_FILE=$(mktemp -t "opencode-mcp-XXXXXX.json")
+        chmod 600 "$OPENCODE_MCP_CONFIG_FILE"
         create_opencode_mcp_config "$MCP_CONFIG" "$OPENCODE_MCP_CONFIG_FILE"
         echo "Converted MCP config for OpenCode: $OPENCODE_MCP_CONFIG_FILE"
     fi
@@ -1226,6 +1241,15 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     # Formatters for consistent output display
     STREAM_FORMATTER="$RALPH_ROOT/lib/stream-formatter.sh"
     OC_FORMATTER="$RALPH_ROOT/lib/oc-formatter.sh"
+
+    # Display filters: route to formatter or suppress in brief mode
+    if [[ "$OUTPUT_MODE" == "brief" ]]; then
+        display_cc() { cat > /dev/null; }
+        display_oc() { cat > /dev/null; }
+    else
+        display_cc() { "$STREAM_FORMATTER"; }
+        display_oc() { "$OC_FORMATTER"; }
+    fi
 
     # Export verbose flag for formatters
     export RALPH_VERBOSE="$VERBOSE"
@@ -1260,24 +1284,24 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     case "$EFFECTIVE_SANDBOX" in
         docker)
             if [[ "$AGENT" == "claudecode" ]]; then
-                { "$SANDBOX_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
+                { "$SANDBOX_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_cc &
             else
-                { "$SANDBOX_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
+                { "$SANDBOX_SCRIPT" --dir "$WORKING_DIR" --image "$CONTAINER_IMAGE" ${DOCKER_EXTRA_ARGS[@]+"${DOCKER_EXTRA_ARGS[@]}"} "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_oc &
             fi
             ;;
         anthropic)
             if [[ "$AGENT" == "claudecode" ]]; then
-                { echo "$full_prompt" | srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
+                { echo "$full_prompt" | srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_cc &
             else
                 # Use wrapper prompt to avoid shell quoting issues through srt
-                { srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" "$WRAPPER_PROMPT" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
+                { srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" "$WRAPPER_PROMPT" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_oc &
             fi
             ;;
         claude|none)
             if [[ "$AGENT" == "claudecode" ]]; then
-                { echo "$full_prompt" | "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
+                { echo "$full_prompt" | "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_cc &
             else
-                { "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
+                { "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | display_oc &
             fi
             ;;
     esac
@@ -1402,6 +1426,11 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     echo "Duration:   $(format_duration $duration_ms)"
     echo "Exit code:  $exit_code"
     echo "Files:      $files_count modified"
+    if [[ $files_count -gt 0 ]] && [[ $files_count -le 10 ]] && [[ -n "$modified_files" ]]; then
+        echo "$modified_files" | tr ',' '\n' | while IFS= read -r f; do
+            [[ -n "$f" ]] && echo "              $f"
+        done
+    fi
     [[ "$STALLED" == "true" ]] && echo "Status:     STALLED (no output for ${STALL_TIMEOUT}s)"
 
     if [[ "$completion_detected" == "true" ]]; then
@@ -1453,6 +1482,16 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
                 echo ""
             fi
 
+            echo "Session:    $SESSION_ID"
+
+            if [[ $files_count -gt 0 ]] && [[ -n "$modified_files" ]]; then
+                echo ""
+                echo "Files modified (final iteration):"
+                echo "$modified_files" | tr ',' '\n' | while IFS= read -r f; do
+                    [[ -n "$f" ]] && echo "  $f"
+                done
+            fi
+
             if [[ "$AGENT" == "opencode" ]]; then
                 save_cost_summary "$SESSION_ID" "$WORKING_DIR"
             fi
@@ -1487,12 +1526,14 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     output_size="${output_size// /}"  # macOS wc pads with spaces
     OUTPUT_FILE=""
 
+    skip_increment=false
     if [[ "$completion_detected" != "true" ]] && [[ "$validation_rejected" != "true" ]]; then
         if is_rate_limit_error "$output_tail" "$CONFIG"; then
             echo "Rate limit detected, marking model and retrying..."
             mark_rate_limited "$MODEL"
             MODEL=$(get_available_model "$TIER") || { echo "Error: No models available"; clear_state; exit 1; }
             echo "Switched to: $MODEL"
+            skip_increment=true
         elif [[ $output_size -lt 50 ]] && [[ $duration_ms -lt 30000 ]]; then
             echo "Agent produced no output (possible rate limit or crash)"
             mark_model_rate_limited "$MODEL" 120 "$RATE_LIMITS"
@@ -1503,6 +1544,7 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
             else
                 echo "No alternative model available, will retry after backoff"
             fi
+            skip_increment=true
         fi
     fi
 
@@ -1513,8 +1555,10 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
         clear_context
     fi
 
-    ((iteration++))
-    update_state "$iteration"
+    if [[ "$skip_increment" != "true" ]]; then
+        ((iteration++))
+        update_state "$iteration"
+    fi
 
     # Exponential backoff on consecutive quick failures (< 30s with no completion)
     if [[ "$completion_detected" != "true" ]] && [[ $duration_ms -lt 30000 ]]; then

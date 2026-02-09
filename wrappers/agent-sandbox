@@ -109,7 +109,7 @@ if [[ -f "$OPENCODE_AUTH_FILE" ]]; then
     VOLUME_MOUNTS+=(-v "$OPENCODE_AUTH_FILE:$CONTAINER_HOME/.local/share/opencode/auth.json:ro")
 fi
 if [[ -d "$OPENCODE_CONFIG_DIR" ]]; then
-    VOLUME_MOUNTS+=(-v "$OPENCODE_CONFIG_DIR:$CONTAINER_HOME/.config/opencode")
+    VOLUME_MOUNTS+=(-v "$OPENCODE_CONFIG_DIR:$CONTAINER_HOME/.config/opencode:ro")
 fi
 if [[ -d "$RALPH_ROOT/agents" ]]; then
     VOLUME_MOUNTS+=(-v "$RALPH_ROOT/agents:/opt/shared-agents:ro")

@@ -2111,7 +2111,7 @@ EOF
 	fi
 
 	log_test "get_model_concurrency_limit reads real config opus limit"
-	result=$(get_model_concurrency_limit "anthropic/claude-opus-4-5" "$REAL_CONFIG")
+	result=$(get_model_concurrency_limit "anthropic/claude-opus-4-6" "$REAL_CONFIG")
 	assert_eq "$result" "2"
 
 	log_test "get_model_concurrency_limit reads real config flash limit"

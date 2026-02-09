@@ -55,7 +55,11 @@ EOF
 
 show_version() {
     local version
-    version=$(git -C "$RALPH_ROOT" describe --tags --always 2>/dev/null || echo "v0.1.0")
+    if [[ -f "$RALPH_ROOT/VERSION" ]]; then
+        version="v$(cat "$RALPH_ROOT/VERSION")"
+    else
+        version=$(git -C "$RALPH_ROOT" describe --tags --always 2>/dev/null || echo "v0.0.0")
+    fi
     echo "ralph $version"
 }
 
