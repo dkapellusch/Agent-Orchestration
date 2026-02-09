@@ -1260,14 +1260,14 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
             if [[ "$AGENT" == "claudecode" ]]; then
                 { echo "$full_prompt" | srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
             else
-                { echo "$full_prompt" | srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
+                { srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
             fi
             ;;
         claude|none)
             if [[ "$AGENT" == "claudecode" ]]; then
                 { echo "$full_prompt" | "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
             else
-                { echo "$full_prompt" | "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
+                { "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
             fi
             ;;
     esac
