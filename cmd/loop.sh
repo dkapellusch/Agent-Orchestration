@@ -1295,18 +1295,16 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
                 # CMD_PID is the formatter (last in pipeline), but the subshell running
                 # srt/agent and tee are siblings that must also die. Walk the full
                 # descendant tree of this script's children (only the pipeline is backgrounded).
-                local pids_to_kill=""
-                local queue
-                queue=$(pgrep -P $$ 2>/dev/null || true)
-                while [[ -n "$queue" ]]; do
-                    local next_queue=""
-                    for pid in $queue; do
+                pids_to_kill=""
+                _queue=$(pgrep -P $$ 2>/dev/null || true)
+                while [[ -n "$_queue" ]]; do
+                    _next_queue=""
+                    for pid in $_queue; do
                         pids_to_kill="$pids_to_kill $pid"
-                        local children
-                        children=$(pgrep -P "$pid" 2>/dev/null || true)
-                        [[ -n "$children" ]] && next_queue="$next_queue $children"
+                        _children=$(pgrep -P "$pid" 2>/dev/null || true)
+                        [[ -n "$_children" ]] && _next_queue="$_next_queue $_children"
                     done
-                    queue="$next_queue"
+                    _queue="$_next_queue"
                 done
                 if [[ -n "$pids_to_kill" ]]; then
                     kill $pids_to_kill 2>/dev/null || true
