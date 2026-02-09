@@ -2162,6 +2162,32 @@ EOF
 	else
 		fail "Expected fallback model, got: $result"
 	fi
+
+	log_test "mark_model_rate_limited with short cooldown marks model"
+	SHORT_RL="$TEST_DIR/short-cooldown-rl.json"
+	echo '{}' >"$SHORT_RL"
+	mark_model_rate_limited "empty-output-model" 120 "$SHORT_RL" 2>/dev/null
+	if is_model_rate_limited "empty-output-model" "$SHORT_RL"; then
+		pass
+	else
+		fail "Model should be rate limited after short cooldown mark"
+	fi
+
+	log_test "short cooldown value is less than default cooldown"
+	# Verify the short cooldown (120s) produces a sooner expiry than default (900s)
+	SHORT_RL2="$TEST_DIR/short-cooldown-rl2.json"
+	echo '{}' >"$SHORT_RL2"
+	mark_model_rate_limited "model-short" 120 "$SHORT_RL2" 2>/dev/null
+	short_until=$(jq -r '.["model-short"]' "$SHORT_RL2")
+	DEFAULT_RL="$TEST_DIR/default-cooldown-rl.json"
+	echo '{}' >"$DEFAULT_RL"
+	mark_model_rate_limited "model-default" 900 "$DEFAULT_RL" 2>/dev/null
+	default_until=$(jq -r '.["model-default"]' "$DEFAULT_RL")
+	if [[ $short_until -lt $default_until ]]; then
+		pass
+	else
+		fail "Short cooldown ($short_until) should expire before default ($default_until)"
+	fi
 )
 
 # =============================================

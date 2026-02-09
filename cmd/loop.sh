@@ -1457,14 +1457,28 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     # Stderr noise from the agent process (2>&1) can contain rate limit keywords
     # that trigger false positives when the iteration actually succeeded
     output_tail=$(tail -50 "$OUTPUT_FILE" 2>/dev/null || echo "")
+    output_size=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo "0")
+    output_size="${output_size// /}"  # macOS wc pads with spaces
     rm -f "$OUTPUT_FILE"
     OUTPUT_FILE=""
 
-    if [[ "$completion_detected" != "true" ]] && [[ "$validation_rejected" != "true" ]] && is_rate_limit_error "$output_tail" "$CONFIG"; then
-        echo "Rate limit detected, marking model and retrying..."
-        mark_rate_limited "$MODEL"
-        MODEL=$(get_available_model "$TIER") || { echo "Error: No models available"; clear_state; exit 1; }
-        echo "Switched to: $MODEL"
+    if [[ "$completion_detected" != "true" ]] && [[ "$validation_rejected" != "true" ]]; then
+        if is_rate_limit_error "$output_tail" "$CONFIG"; then
+            echo "Rate limit detected, marking model and retrying..."
+            mark_rate_limited "$MODEL"
+            MODEL=$(get_available_model "$TIER") || { echo "Error: No models available"; clear_state; exit 1; }
+            echo "Switched to: $MODEL"
+        elif [[ $output_size -lt 50 ]] && [[ $duration_ms -lt 30000 ]]; then
+            echo "Agent produced no output (possible rate limit or crash)"
+            mark_model_rate_limited "$MODEL" 120 "$RATE_LIMITS"
+            NEW_MODEL=$(get_available_model "$TIER") || true
+            if [[ -n "${NEW_MODEL:-}" ]] && [[ "$NEW_MODEL" != "$MODEL" ]]; then
+                MODEL="$NEW_MODEL"
+                echo "Switched to: $MODEL"
+            else
+                echo "No alternative model available, will retry after backoff"
+            fi
+        fi
     fi
 
     check_struggle
