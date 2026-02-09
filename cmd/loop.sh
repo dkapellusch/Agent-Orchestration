@@ -1248,6 +1248,15 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     # Use a temp file to capture the agent's actual exit code
     AGENT_EXIT_CODE_FILE="$RALPH_DIR/agent_exit_code.tmp"
 
+    # For OpenCode with Anthropic sandbox: write prompt to file and create wrapper to avoid shell quoting issues
+    PROMPT_FILE=""
+    WRAPPER_PROMPT=""
+    if [[ "$AGENT" == "opencode" ]] && [[ "$EFFECTIVE_SANDBOX" == "anthropic" ]]; then
+        PROMPT_FILE="$RALPH_DIR/prompt-iter-${iteration}.txt"
+        printf '%s' "$full_prompt" > "$PROMPT_FILE"
+        WRAPPER_PROMPT="Read the file at $PROMPT_FILE and fully follow all instructions in it."
+    fi
+
     case "$EFFECTIVE_SANDBOX" in
         docker)
             if [[ "$AGENT" == "claudecode" ]]; then
@@ -1260,7 +1269,8 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
             if [[ "$AGENT" == "claudecode" ]]; then
                 { echo "$full_prompt" | srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$STREAM_FORMATTER" &
             else
-                { srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" "$full_prompt" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
+                # Use wrapper prompt to avoid shell quoting issues through srt
+                { srt --settings "$ACTIVE_SANDBOX_CONFIG" -- "${BASE_CMD[@]}" "$WRAPPER_PROMPT" < /dev/null 2>&1; echo $? > "$AGENT_EXIT_CODE_FILE"; } | tee "$OUTPUT_FILE" | "$OC_FORMATTER" &
             fi
             ;;
         claude|none)
