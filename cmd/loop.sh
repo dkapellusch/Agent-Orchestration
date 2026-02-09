@@ -729,7 +729,7 @@ EOF
 
 init_state() {
     local model=$1
-    mkdir -p "$RALPH_DIR"
+    mkdir -p "$RALPH_DIR/logs"
     if ! jq -n \
         --arg model "$model" \
         --argjson maxIterations "$MAX_ITERATIONS" \
@@ -954,7 +954,6 @@ cleanup() {
         docker ps -q --filter "ancestor=$CONTAINER_IMAGE" 2>/dev/null | xargs -r docker kill 2>/dev/null || true
     fi
 
-    [[ -n "$OUTPUT_FILE" ]] && rm -f "$OUTPUT_FILE"
     [[ -n "$SNAPSHOT_BEFORE" ]] && rm -f "$SNAPSHOT_BEFORE"
     [[ -n "$SNAPSHOT_AFTER" ]] && rm -f "$SNAPSHOT_AFTER"
     [[ -n "$TEMP_SANDBOX_CONFIG" ]] && rm -f "$TEMP_SANDBOX_CONFIG"
@@ -1189,7 +1188,7 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     full_prompt=$(build_mission_prompt "$iteration")
 
     start_time=$(date +%s)
-    OUTPUT_FILE=$(mktemp)
+    OUTPUT_FILE="$RALPH_DIR/logs/iteration-${iteration}.log"
 
     STALLED=false
 
@@ -1476,7 +1475,6 @@ while [[ $MAX_ITERATIONS -eq 0 ]] || [[ $iteration -le $MAX_ITERATIONS ]]; do
     output_tail=$(tail -50 "$OUTPUT_FILE" 2>/dev/null || echo "")
     output_size=$(wc -c < "$OUTPUT_FILE" 2>/dev/null || echo "0")
     output_size="${output_size// /}"  # macOS wc pads with spaces
-    rm -f "$OUTPUT_FILE"
     OUTPUT_FILE=""
 
     if [[ "$completion_detected" != "true" ]] && [[ "$validation_rejected" != "true" ]]; then
